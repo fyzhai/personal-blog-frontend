@@ -52,6 +52,7 @@ const searchQuery = ref('') // 新增搜索查询状态
 let searchTimeout = null; // 用于防抖
 
 const fetchPosts = async () => {
+  console.log("fetchPosts: Starting...");
   loading.value = true
   let query = supabase
     .from('posts')
@@ -79,8 +80,10 @@ const fetchPosts = async () => {
     console.error('Error fetching posts:', error.message)
   } else {
     posts.value = data
+    console.log("fetchPosts: Data fetched, posts.value now:", posts.value);
   }
   loading.value = false
+  console.log("fetchPosts: Finished, loading.value:", loading.value, "posts.length:", posts.value.length);
 }
 
 const handleSearchInput = () => {
@@ -111,21 +114,24 @@ const handleLogout = async () => {
 }
 
 onMounted(async () => {
+  console.log("onMounted: Component mounted.");
   await fetchPosts()
+  console.log("onMounted: fetchPosts completed, posts.length:", posts.value.length);
 
   // Check for authenticated user
   const { data: { session } } = await supabase.auth.getSession()
   user.value = session?.user || null
+  console.log("onMounted: Initial user session check, user:", user.value ? user.value.id : 'null');
 
   // Listen for auth state changes
   supabase.auth.onAuthStateChange((_, _session) => {
-    user.value = _session?.user || null
-    if (!user.value) {
-      posts.value = [] // Clear posts if user logs out
-    } else {
-      fetchPosts() // Re-fetch posts if user logs in
-    }
-  })
+    console.log("onAuthStateChange: Auth state changed.", "_session:", _session);
+    user.value = _session?.user || null;
+    // 无论登录状态如何变化，都重新获取文章，确保页面显示最新数据
+    // fetchPosts() 会根据 RLS 策略和 is_published 状态自动过滤
+    fetchPosts();
+  });
+  console.log("onMounted: onAuthStateChange listener set up.");
 })
 
 // 监听 searchQuery 变化以触发搜索 (可以移除 @input 事件，如果只使用 watch)
