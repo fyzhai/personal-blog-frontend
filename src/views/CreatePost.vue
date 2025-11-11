@@ -74,35 +74,67 @@ const handlePostSubmission = async (isPublishedStatus) => {
   }
 
   try {
-    const { data, error } = await supabase
-      .from('posts')
-      .insert({
-        author_id: user.id,
-        title: title.value,
-        slug: slug.value,
-        content: content.value,
-        is_published: isPublishedStatus,
-        published_at: isPublishedStatus ? new Date() : null
-      })
-      .select()
+    // 对于发布，使用 select() 以便拿到 id；对于草稿，用 returning: 'minimal' 避免触发 SELECT RLS
+    if (isPublishedStatus) {
+      const { data, error } = await supabase
+        .from('posts')
+        .insert({
+          author_id: user.id,
+          title: title.value,
+          slug: slug.value,
+          content: content.value,
+          is_published: true,
+          // 列为 NOT NULL，设置发布时间
+          published_at: new Date()
+        })
+        .select();
 
-    if (error) {
-      postErrorMessage.value = error.message;
-      console.error('Error creating post:', error.message);
-      setTimeout(() => postErrorMessage.value = null, 3000);
-    } else if (data && data.length > 0) {
-      postSuccessMessage.value = isPublishedStatus ? '文章发布成功！' : '文章已存为草稿！';
-      setTimeout(() => postSuccessMessage.value = null, 3000); // 3秒后清除消息
+      if (error) {
+        postErrorMessage.value = error.message;
+        console.error('Error creating post:', error.message);
+        setTimeout(() => postErrorMessage.value = null, 3000);
+        return;
+      }
+
+      postSuccessMessage.value = '文章发布成功！';
+      setTimeout(() => postSuccessMessage.value = null, 3000);
       title.value = '';
       slug.value = '';
       content.value = '';
-
-      if (isPublishedStatus) {
-        router.push(`/post/${data[0].id}`); // 发布成功后跳转到文章详情页
+      if (data && data.length > 0) {
+        router.push(`/post/${data[0].id}`);
       } else {
-        router.push('/profile'); // 存为草稿后跳转到个人资料页的文章列表
+        router.push('/');
       }
+    } else {
+      const { error } = await supabase
+        .from('posts')
+        .insert({
+          author_id: user.id,
+          title: title.value,
+          slug: slug.value,
+          content: content.value,
+          is_published: false,
+          // 列为 NOT NULL，给一个时间戳避免约束失败
+          published_at: new Date()
+        }, { returning: 'minimal' });
+
+      if (error) {
+        postErrorMessage.value = error.message;
+        console.error('Error creating draft:', error.message);
+        setTimeout(() => postErrorMessage.value = null, 3000);
+        return;
+      }
+
+      postSuccessMessage.value = '文章已存为草稿！';
+      setTimeout(() => postSuccessMessage.value = null, 3000);
+      title.value = '';
+      slug.value = '';
+      content.value = '';
+      router.push('/profile');
     }
+
+
   } catch (err) {
     postErrorMessage.value = '发生未知错误。';
     console.error(err);

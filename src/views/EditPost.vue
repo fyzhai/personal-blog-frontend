@@ -121,33 +121,60 @@ const handlePostUpdate = async (isPublishedStatus) => {
   }
 
   try {
-    const { data, error } = await supabase
-      .from('posts')
-      .update({
-        title: title.value,
-        slug: slug.value,
-        content: content.value,
-        is_published: isPublishedStatus,
-        updated_at: new Date(), // 更新 updated_at 字段
-        published_at: isPublishedStatus ? new Date() : null
-      })
-      .eq('id', postId.value)
-      .select();
+    if (isPublishedStatus) {
+      const { data, error } = await supabase
+        .from('posts')
+        .update({
+          title: title.value,
+          slug: slug.value,
+          content: content.value,
+          is_published: true,
+          updated_at: new Date(),
+          // 列为 NOT NULL，设置发布时间
+          published_at: new Date()
+        })
+        .eq('id', postId.value)
+        .select();
 
-    if (error) {
-      postErrorMessage.value = error.message;
-      console.error('Error updating post:', error.message);
-      setTimeout(() => postErrorMessage.value = null, 3000);
-    } else if (data && data.length > 0) {
-      postSuccessMessage.value = isPublishedStatus ? '文章更新并发布成功！' : '文章已保存为草稿！';
+      if (error) {
+        postErrorMessage.value = error.message;
+        console.error('Error updating post:', error.message);
+        setTimeout(() => postErrorMessage.value = null, 3000);
+        return;
+      }
+
+      postSuccessMessage.value = '文章更新并发布成功！';
       setTimeout(() => postSuccessMessage.value = null, 3000);
-
-      // 更新成功后可以跳转到文章详情页或个人资料页
-      if (isPublishedStatus) {
+      if (data && data.length > 0) {
         router.push(`/post/${data[0].id}`);
       } else {
-        router.push('/profile');
+        router.push('/');
       }
+    } else {
+      const { error } = await supabase
+        .from('posts')
+        .update({
+          title: title.value,
+          slug: slug.value,
+          content: content.value,
+          is_published: false,
+          updated_at: new Date(),
+          // 列为 NOT NULL，这里也保留一个时间戳
+          published_at: new Date()
+        })
+        .eq('id', postId.value)
+        .select({ head: true, count: 'exact' }); // 避免返回行，尽量减少 RLS 影响
+
+      if (error) {
+        postErrorMessage.value = error.message;
+        console.error('Error saving draft:', error.message);
+        setTimeout(() => postErrorMessage.value = null, 3000);
+        return;
+      }
+
+      postSuccessMessage.value = '文章已保存为草稿！';
+      setTimeout(() => postSuccessMessage.value = null, 3000);
+      router.push('/profile');
     }
   } catch (err) {
     postErrorMessage.value = '发生未知错误。';
