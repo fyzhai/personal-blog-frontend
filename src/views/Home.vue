@@ -73,12 +73,14 @@ const fetchPosts = async () => {
     .order('published_at', { ascending: false })
 
   if (searchQuery.value) {
-    // 优化模糊搜索查询
+    // 修复模糊搜索查询语法
     const searchTerm = searchQuery.value.toLowerCase().trim();
     if (searchTerm) {
-      // 使用百分号通配符确保正确的模糊搜索
-      query = query.or(`title.ilike.*${searchTerm}*,profiles.username.ilike.*${searchTerm}*`);
-      console.log('Searching with term:', searchTerm);
+      // 使用PostgREST正确的百分号通配符语法
+      const wildcardTerm = `%${searchTerm}%`;
+      // 分别构建每个条件并使用正确的语法
+      query = query.or(`title.ilike.${wildcardTerm},profiles.username.ilike.${wildcardTerm}`);
+      console.log('Searching with term:', searchTerm, 'wildcardTerm:', wildcardTerm);
     }
   }
 
