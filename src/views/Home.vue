@@ -13,11 +13,14 @@
     </div>
 
     <div class="posts-list">
-      <div v-if="posts.length === 0 && !loading">
-        <p class="no-posts">目前还没有文章。请稍后再回来看看！</p>
-      </div>
-      <div v-else-if="loading">
+      <div v-if="loading">
         <p class="loading-message">加载文章中...</p>
+      </div>
+      <div v-else-if="isSearching && posts.length === 0">
+        <p class="no-search-results">没有找到与"{{ searchQuery }}"相关的文章。</p>
+      </div>
+      <div v-else-if="posts.length === 0">
+        <p class="no-posts">目前还没有文章。请稍后再回来看看！</p>
       </div>
       <div v-else v-for="post in posts" :key="post.id" class="post-card">
         <h3><router-link :to="`/post/${post.id}`">{{ post.title }}</router-link></h3>
@@ -49,11 +52,14 @@ const loading = ref(true)
 const user = ref(null)
 const router = useRouter()
 const searchQuery = ref('') // 新增搜索查询状态
+const isSearching = ref(false) // 标记是否正在进行搜索
 let searchTimeout = null; // 用于防抖
 
 const fetchPosts = async () => {
   console.log("fetchPosts: Starting...");
   loading.value = true
+  isSearching.value = !!searchQuery.value.trim(); // 设置搜索状态
+  
   let query = supabase
     .from('posts')
     .select(`
@@ -67,11 +73,13 @@ const fetchPosts = async () => {
     .order('published_at', { ascending: false })
 
   if (searchQuery.value) {
-    // 简化搜索查询，使用PostgREST支持的简单格式
+    // 优化模糊搜索查询
     const searchTerm = searchQuery.value.toLowerCase().trim();
-    // 不使用复杂的手动编码，而是让Supabase客户端处理编码
-    query = query.or(`title.ilike.*${searchTerm}*,profiles.username.ilike.*${searchTerm}*`);
-    console.log('Searching with term:', searchTerm);
+    if (searchTerm) {
+      // 使用百分号通配符确保正确的模糊搜索
+      query = query.or(`title.ilike.*${searchTerm}*,profiles.username.ilike.*${searchTerm}*`);
+      console.log('Searching with term:', searchTerm);
+    }
   }
 
   const { data, error } = await query;
@@ -79,7 +87,7 @@ const fetchPosts = async () => {
   if (error) {
     console.error('Error fetching posts:', error.message)
   } else {
-    posts.value = data
+    posts.value = data || []
     console.log("fetchPosts: Data fetched, posts.value now:", posts.value);
   }
   loading.value = false
@@ -241,11 +249,19 @@ onMounted(async () => {
   text-decoration: none;
 }
 
-.no-posts, .loading-message {
+.no-posts, .loading-message, .no-search-results {
   text-align: center;
   font-size: 1.1rem;
-  color: #777;
   padding: 2rem 0;
+}
+
+.no-posts, .loading-message {
+  color: #777;
+}
+
+.no-search-results {
+  color: #555;
+  font-weight: 500;
 }
 
 .logout-button {
