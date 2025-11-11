@@ -133,7 +133,8 @@ const resendConfirmationEmail = async () => {
   try {
     console.log('正在重新发送确认邮件到:', email.value);
     const { error } = await supabase.auth.resend({ 
-      type: 'email_change',
+      // 重新发送注册确认邮件应使用 signup 类型
+      type: 'signup',
       email: email.value,
       options: {
         emailRedirectTo: 'https://personal-blog-frontend.netlify.app/'
