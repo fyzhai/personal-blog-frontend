@@ -128,13 +128,16 @@ const handlePostSubmission = async (isPublishedStatus) => {
       }
     } else {
       // 草稿：避免触发 select RLS，使用 returning:minimal；处理一次重复 slug 自动改名
+      // 为避免与他人或自己历史记录的 slug 冲突，草稿默认追加一次短唯一后缀
+      attemptSlug = `${originalSlug}-${Date.now().toString(36).slice(-5)}`;
+
       let { error } = await supabase
         .from('posts')
         .insert(makePayload(false, attemptSlug), { returning: 'minimal' });
 
       if (isUniqueViolation(error) && !attemptedOnce) {
         attemptedOnce = true;
-        attemptSlug = `${originalSlug}-${Date.now().toString(36).slice(-5)}`;
+        attemptSlug = `${originalSlug}-${Math.random().toString(36).slice(-5)}`;
         ({ error } = await supabase
           .from('posts')
           .insert(makePayload(false, attemptSlug), { returning: 'minimal' }));
