@@ -82,6 +82,7 @@ const handlePostSubmission = async (isPublishedStatus) => {
         slug: slug.value,
         content: content.value,
         is_published: isPublishedStatus,
+        published_at: isPublishedStatus ? new Date() : null
       })
       .select()
 

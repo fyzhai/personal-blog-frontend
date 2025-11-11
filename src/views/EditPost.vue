@@ -129,6 +129,7 @@ const handlePostUpdate = async (isPublishedStatus) => {
         content: content.value,
         is_published: isPublishedStatus,
         updated_at: new Date(), // 更新 updated_at 字段
+        published_at: isPublishedStatus ? new Date() : null
       })
       .eq('id', postId.value)
       .select();
