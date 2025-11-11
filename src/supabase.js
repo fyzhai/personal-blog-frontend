@@ -5,4 +5,11 @@ import { createClient } from '@supabase/supabase-js'
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://cvvbhaqsrxynyakbjvfb.supabase.co'
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN2dmJoYXFzcnh5bnlha2JqdmZiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI3NDIyMzcsImV4cCI6MjA3ODMxODIzN30.Stq4w234SCIk1l__AFF9fx59-1I71h6zUuGmoP88wl8'
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+// 设置重定向URL为Netlify域名
+const redirectTo = 'https://personal-blog-frontend.netlify.app/'
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    redirectTo: redirectTo
+  }
+})
