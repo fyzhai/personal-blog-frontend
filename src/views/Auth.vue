@@ -13,7 +13,12 @@
         </div>
         <button type="submit" class="auth-button">{{ isLogin ? '登录' : '注册' }}</button>
         <p v-if="authErrorMessage" class="error-message">{{ authErrorMessage }}</p>
-        <p v-if="authSuccessMessage" class="success-message">{{ authSuccessMessage }}</p>
+        <p v-if="authSuccessMessage" class="success-message">
+          {{ authSuccessMessage }}
+          <button v-if="showResendButton" @click="resendConfirmationEmail" class="resend-button">
+            重新发送确认邮件
+          </button>
+        </p>
         <p class="toggle-auth">
           {{ isLogin ? '还没有账号？' : '已有账号？' }}
           <a href="#" @click.prevent="toggleAuthMode">{{ isLogin ? '注册' : '登录' }}</a>
@@ -33,6 +38,7 @@ const password = ref('')
 const isLogin = ref(true) // true for login, false for register
 const authErrorMessage = ref(null) // 用于页面内错误消息
 const authSuccessMessage = ref(null) // 用于页面内成功消息
+const showResendButton = ref(false) // 控制重发邮件按钮显示
 const router = useRouter()
 
 const toggleAuthMode = () => {
@@ -42,33 +48,35 @@ const toggleAuthMode = () => {
 }
 
 const handleAuth = async () => {
-  authErrorMessage.value = null // Clear previous errors
-  authSuccessMessage.value = null // Clear previous success messages
+    authErrorMessage.value = null // Clear previous errors
+    authSuccessMessage.value = null // Clear previous success messages
 
-  try {
-    let response;
-    // 使用Netlify域名而不是本地地址，确保邮件确认链接正确
-    const redirectTo = 'https://personal-blog-frontend.netlify.app/';
-    
-    if (isLogin.value) {
-      // Login
-      response = await supabase.auth.signInWithPassword({
-        email: email.value,
-        password: password.value,
-      })
-    } else {
-      // Register - 添加redirectTo参数确保注册后能正确重定向
-      console.log('准备注册用户，邮箱:', email.value, '重定向URL:', redirectTo);
-      response = await supabase.auth.signUp({
-        email: email.value,
-        password: password.value,
-      }, {
-        redirectTo: redirectTo,
-        // 明确指定需要发送确认邮件
-        shouldCreateUser: true
-      })
-      console.log('注册响应:', response);
-    }
+    try {
+      let response;
+      // 使用Netlify域名而不是本地地址，确保邮件确认链接正确
+      const redirectTo = 'https://personal-blog-frontend.netlify.app/';
+      
+      if (isLogin.value) {
+        // Login
+        response = await supabase.auth.signInWithPassword({
+          email: email.value,
+          password: password.value,
+        })
+      } else {
+        // Register - 添加redirectTo参数确保注册后能正确重定向
+        console.log('准备注册用户，邮箱:', email.value, '重定向URL:', redirectTo);
+        // 尝试使用最新的API参数格式
+        response = await supabase.auth.signUp({
+          email: email.value,
+          password: password.value,
+          options: {
+            emailRedirectTo: redirectTo,
+            // 明确指定需要发送确认邮件
+            shouldCreateUser: true
+          }
+        })
+        console.log('注册响应详情:', JSON.stringify(response, null, 2));
+      }
 
     const { data, error } = response;
 
@@ -94,12 +102,14 @@ const handleAuth = async () => {
             router.replace('/');
           }
         } else if (!isLogin.value && !data.user.email_confirmed_at) {
-          // 如果是注册但邮箱未确认，显示提示信息
-          console.log('用户注册成功但邮箱未确认，检查垃圾邮件文件夹');
-          authSuccessMessage.value = '注册成功！确认邮件已发送，请检查邮箱(包括垃圾邮件文件夹)进行确认。';
-          setTimeout(() => {
-            authSuccessMessage.value = null;
-          }, 8000); // 显示更长时间，让用户有足够时间看到提示
+        // 如果是注册但邮箱未确认，显示提示信息和重发按钮
+        console.log('用户注册成功但邮箱未确认，检查垃圾邮件文件夹');
+        authSuccessMessage.value = '注册成功！确认邮件已发送，请检查邮箱(包括垃圾邮件文件夹)进行确认。';
+        showResendButton.value = true;
+        setTimeout(() => {
+          authSuccessMessage.value = null;
+          showResendButton.value = false;
+        }, 12000); // 显示更长时间，让用户有足够时间看到提示和重发邮件
         }
       } else if (data.session) {
         // 有时可能只有session没有user对象，这也是成功状态
@@ -115,6 +125,38 @@ const handleAuth = async () => {
     authErrorMessage.value = '发生未知错误。';
     setTimeout(() => authErrorMessage.value = null, 3000); // 3秒后清除消息
     console.error('Unexpected auth error:', err)
+  }
+}
+
+// 重发确认邮件功能
+const resendConfirmationEmail = async () => {
+  try {
+    console.log('正在重新发送确认邮件到:', email.value);
+    const { error } = await supabase.auth.resend({ 
+      type: 'email_change',
+      email: email.value,
+      options: {
+        emailRedirectTo: 'https://personal-blog-frontend.netlify.app/'
+      }
+    });
+    
+    if (error) {
+      console.error('重发邮件失败:', error);
+      authErrorMessage.value = '重发邮件失败: ' + error.message;
+      setTimeout(() => authErrorMessage.value = null, 3000);
+    } else {
+      console.log('确认邮件已重新发送');
+      authSuccessMessage.value = '确认邮件已重新发送，请检查邮箱！';
+      // 重置定时器，让消息再显示一段时间
+      setTimeout(() => {
+        authSuccessMessage.value = null;
+        showResendButton.value = false;
+      }, 8000);
+    }
+  } catch (err) {
+    console.error('重发邮件时发生错误:', err);
+    authErrorMessage.value = '重发邮件时发生未知错误。';
+    setTimeout(() => authErrorMessage.value = null, 3000);
   }
 }
 
@@ -215,5 +257,21 @@ const createProfileIfNeeded = async (userId, userEmail) => {
   color: #28a745;
   margin-top: 1rem;
   font-size: 0.95rem;
+}
+
+.resend-button {
+  background-color: #17a2b8;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  margin-left: 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: background-color 0.2s;
+}
+
+.resend-button:hover {
+  background-color: #138496;
 }
 </style>
