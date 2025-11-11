@@ -71,16 +71,7 @@ const fetchPosts = async () => {
       .eq('is_published', true)
       .order('published_at', { ascending: false });
 
-  if (searchQuery.value) {
-    // 修复模糊搜索查询语法（显式添加括号并编码通配符，避免 PostgREST 解析问题）
-    const searchTerm = searchQuery.value.toLowerCase().trim();
-    if (searchTerm) {
-      const encodedWildcard = encodeURIComponent(`%${searchTerm}%`);
-      const orFilter = `(title.ilike.${encodedWildcard},profiles.username.ilike.${encodedWildcard})`;
-      query = query.or(orFilter);
-      console.log('Searching with term:', searchTerm, 'encodedWildcard:', encodedWildcard);
-    }
-  }
+  // 不在数据库层面做 or 模糊匹配，避免 PostgREST 对中文和跨表字段的解析问题
 
     // 执行查询
     console.log('Ready to execute query');
@@ -92,7 +83,19 @@ const fetchPosts = async () => {
       posts.value = [];
     } else {
       // 成功获取数据
-      posts.value = data || [];
+      const rawPosts = data || [];
+
+      // 如果有搜索关键字，则在前端进行容错过滤（支持中文）
+      if (isSearching.value) {
+        const keyword = searchTerm.toLowerCase();
+        posts.value = rawPosts.filter(p => {
+          const title = (p.title || '').toLowerCase();
+          const author = (p.profiles?.username || '').toLowerCase();
+          return title.includes(keyword) || author.includes(keyword);
+        });
+      } else {
+        posts.value = rawPosts;
+      }
       console.log('Data fetched successfully, count:', posts.value.length);
       
       // 如果是搜索结果，记录一下
