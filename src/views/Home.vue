@@ -67,10 +67,11 @@ const fetchPosts = async () => {
     .order('published_at', { ascending: false })
 
   if (searchQuery.value) {
-    // 正确使用PostgREST的or操作符语法
-    const searchTerm = searchQuery.value.toLowerCase();
-    // 使用正确的or查询格式，PostgREST需要使用括号包围条件
-    query = query.or(`(title.ilike.${encodeURIComponent('%')}${encodeURIComponent(searchTerm)}${encodeURIComponent('%')},profiles.username.ilike.${encodeURIComponent('%')}${encodeURIComponent(searchTerm)}${encodeURIComponent('%')})`);
+    // 简化搜索查询，使用PostgREST支持的简单格式
+    const searchTerm = searchQuery.value.toLowerCase().trim();
+    // 不使用复杂的手动编码，而是让Supabase客户端处理编码
+    query = query.or(`title.ilike.*${searchTerm}*,profiles.username.ilike.*${searchTerm}*`);
+    console.log('Searching with term:', searchTerm);
   }
 
   const { data, error } = await query;
