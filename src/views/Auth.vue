@@ -47,7 +47,8 @@ const handleAuth = async () => {
 
   try {
     let response;
-    const redirectTo = window.location.origin + '/'; // 确保使用正确的URL格式
+    // 使用Netlify域名而不是本地地址，确保邮件确认链接正确
+    const redirectTo = 'https://personal-blog-frontend.netlify.app/';
     
     if (isLogin.value) {
       // Login
