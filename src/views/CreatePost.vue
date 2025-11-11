@@ -74,24 +74,44 @@ const handlePostSubmission = async (isPublishedStatus) => {
   }
 
   try {
-    // 对于发布，使用 select() 以便拿到 id；对于草稿，用 returning: 'minimal' 避免触发 SELECT RLS
+    const makePayload = (published, slugValue) => ({
+      author_id: user.id,
+      title: title.value,
+      slug: slugValue,
+      content: content.value,
+      is_published: published,
+      // 列为 NOT NULL，统一赋值，服务端如需严格控制可在RLS/触发器中校验
+      published_at: new Date()
+    });
+
+    const isUniqueViolation = (err) => {
+      // Postgres unique violation code 23505, or HTTP 409 from PostgREST
+      return !!err && (err.code === '23505' || err.code === '409' || err.message?.includes('duplicate key value') || err.details?.includes('already exists'));
+    };
+
+    const originalSlug = slug.value.trim();
+    let attemptSlug = originalSlug;
+    let attemptedOnce = false;
+
     if (isPublishedStatus) {
-      const { data, error } = await supabase
+      // 发布：需要返回 id
+      let { data, error } = await supabase
         .from('posts')
-        .insert({
-          author_id: user.id,
-          title: title.value,
-          slug: slug.value,
-          content: content.value,
-          is_published: true,
-          // 列为 NOT NULL，设置发布时间
-          published_at: new Date()
-        })
+        .insert(makePayload(true, attemptSlug))
         .select();
 
+      if (isUniqueViolation(error) && !attemptedOnce) {
+        attemptedOnce = true;
+        attemptSlug = `${originalSlug}-${Date.now().toString(36).slice(-5)}`;
+        ({ data, error } = await supabase
+          .from('posts')
+          .insert(makePayload(true, attemptSlug))
+          .select());
+      }
+
       if (error) {
-        postErrorMessage.value = error.message;
-        console.error('Error creating post:', error.message);
+        postErrorMessage.value = error.message || '发布失败';
+        console.error('Error creating post:', error);
         setTimeout(() => postErrorMessage.value = null, 3000);
         return;
       }
@@ -99,7 +119,7 @@ const handlePostSubmission = async (isPublishedStatus) => {
       postSuccessMessage.value = '文章发布成功！';
       setTimeout(() => postSuccessMessage.value = null, 3000);
       title.value = '';
-      slug.value = '';
+      slug.value = attemptSlug;
       content.value = '';
       if (data && data.length > 0) {
         router.push(`/post/${data[0].id}`);
@@ -107,21 +127,22 @@ const handlePostSubmission = async (isPublishedStatus) => {
         router.push('/');
       }
     } else {
-      const { error } = await supabase
+      // 草稿：避免触发 select RLS，使用 returning:minimal；处理一次重复 slug 自动改名
+      let { error } = await supabase
         .from('posts')
-        .insert({
-          author_id: user.id,
-          title: title.value,
-          slug: slug.value,
-          content: content.value,
-          is_published: false,
-          // 列为 NOT NULL，给一个时间戳避免约束失败
-          published_at: new Date()
-        }, { returning: 'minimal' });
+        .insert(makePayload(false, attemptSlug), { returning: 'minimal' });
+
+      if (isUniqueViolation(error) && !attemptedOnce) {
+        attemptedOnce = true;
+        attemptSlug = `${originalSlug}-${Date.now().toString(36).slice(-5)}`;
+        ({ error } = await supabase
+          .from('posts')
+          .insert(makePayload(false, attemptSlug), { returning: 'minimal' }));
+      }
 
       if (error) {
-        postErrorMessage.value = error.message;
-        console.error('Error creating draft:', error.message);
+        postErrorMessage.value = error.message || '保存草稿失败';
+        console.error('Error creating draft:', error);
         setTimeout(() => postErrorMessage.value = null, 3000);
         return;
       }
@@ -129,11 +150,10 @@ const handlePostSubmission = async (isPublishedStatus) => {
       postSuccessMessage.value = '文章已存为草稿！';
       setTimeout(() => postSuccessMessage.value = null, 3000);
       title.value = '';
-      slug.value = '';
+      slug.value = attemptSlug;
       content.value = '';
       router.push('/profile');
     }
-
 
   } catch (err) {
     postErrorMessage.value = '发生未知错误。';
