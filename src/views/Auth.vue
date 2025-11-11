@@ -47,6 +47,8 @@ const handleAuth = async () => {
 
   try {
     let response;
+    const redirectTo = window.location.origin + '/'; // 确保使用正确的URL格式
+    
     if (isLogin.value) {
       // Login
       response = await supabase.auth.signInWithPassword({
@@ -54,10 +56,12 @@ const handleAuth = async () => {
         password: password.value,
       })
     } else {
-      // Register
+      // Register - 添加redirectTo参数确保注册后能正确重定向
       response = await supabase.auth.signUp({
         email: email.value,
         password: password.value,
+      }, {
+        redirectTo: redirectTo
       })
     }
 
@@ -66,42 +70,73 @@ const handleAuth = async () => {
     if (error) {
       authErrorMessage.value = error.message
       setTimeout(() => authErrorMessage.value = null, 3000); // 3秒后清除消息
-    } else if (data.user) {
-      console.log('Auth successful:', data.user)
-      authSuccessMessage.value = isLogin.value ? '登录成功！' : '注册成功！';
-      setTimeout(() => {
-        authSuccessMessage.value = null;
-        router.push('/'); // Redirect to home page on successful auth after message
-      }, 1500); // 1.5秒后清除消息并跳转
-
-      // 在用户认证成功后，检查并创建/更新profiles表中的用户资料
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('id', data.user.id)
-        .single()
-
-      if (profileError && profileError.code === 'PGRST116') { // No rows found
-        console.log('Creating new profile for user:', data.user.id)
-        const { error: insertError } = await supabase
-          .from('profiles')
-          .insert({
-            id: data.user.id,
-            username: data.user.email.split('@')[0], // Use part of email as default username
-          })
-        if (insertError) {
-          console.error('Error creating profile:', insertError.message)
+      console.error('Auth error:', error)
+    } else {
+      // 检查是否有用户对象
+      if (data.user) {
+        console.log('Auth successful:', data.user)
+        authSuccessMessage.value = isLogin.value ? '登录成功！' : '注册成功！';
+        
+        // 直接进行页面跳转，不再依赖setTimeout，确保跳转逻辑可靠执行
+        // 为注册添加特殊处理，确保即使在邮箱未确认情况下也能正确处理
+        if (isLogin.value || (!isLogin.value && data.user.email_confirmed_at)) {
+          // 立即刷新会话以确保最新状态
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session) {
+            // 确保profile创建操作不会阻止页面跳转
+            createProfileIfNeeded(data.user.id, data.user.email).catch(console.error);
+            // 使用replace避免返回登录页
+            router.replace('/');
+          }
+        } else if (!isLogin.value && !data.user.email_confirmed_at) {
+          // 如果是注册但邮箱未确认，显示提示信息
+          authSuccessMessage.value = '注册成功！请检查邮箱进行确认。';
+          setTimeout(() => {
+            authSuccessMessage.value = null;
+          }, 5000); // 显示更长时间
         }
-      } else if (profileError) {
-        console.error('Error fetching profile:', profileError.message)
+      } else if (data.session) {
+        // 有时可能只有session没有user对象，这也是成功状态
+        console.log('Auth session established:', data.session)
+        authSuccessMessage.value = isLogin.value ? '登录成功！' : '注册成功！';
+        // 确保profile创建
+        createProfileIfNeeded(data.session.user.id, data.session.user.email).catch(console.error);
+        router.replace('/');
       }
-
     }
 
   } catch (err) {
     authErrorMessage.value = '发生未知错误。';
     setTimeout(() => authErrorMessage.value = null, 3000); // 3秒后清除消息
-    console.error(err)
+    console.error('Unexpected auth error:', err)
+  }
+}
+
+// 将profile创建逻辑抽取为单独函数，便于错误处理
+const createProfileIfNeeded = async (userId, userEmail) => {
+  try {
+    const { data: profileData, error: profileError } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('id', userId)
+      .single()
+
+    if (profileError && profileError.code === 'PGRST116') { // No rows found
+      console.log('Creating new profile for user:', userId)
+      const { error: insertError } = await supabase
+        .from('profiles')
+        .insert({
+          id: userId,
+          username: userEmail.split('@')[0], // Use part of email as default username
+        })
+      if (insertError) {
+        console.error('Error creating profile:', insertError.message)
+      }
+    } else if (profileError) {
+      console.error('Error fetching profile:', profileError.message)
+    }
+  } catch (err) {
+    console.error('Error in createProfileIfNeeded:', err)
   }
 }
 </script>
