@@ -162,8 +162,7 @@ const handlePostUpdate = async (isPublishedStatus) => {
           // 列为 NOT NULL，这里也保留一个时间戳
           published_at: new Date()
         })
-        .eq('id', postId.value)
-        .select({ head: true, count: 'exact' }); // 避免返回行，尽量减少 RLS 影响
+        .eq('id', postId.value); // 不调用 .select()，返回 204，避免触发 SELECT RLS
 
       if (error) {
         postErrorMessage.value = error.message;
