@@ -63,19 +63,31 @@ const handleAuth = async () => {
           password: password.value,
         })
       } else {
-        // Register - 添加redirectTo参数确保注册后能正确重定向
+        // 注册：如果 Supabase 关闭了 “Confirm email”，将直接返回 session；
+        // 若未关闭，我们会在注册后尝试用账号密码直接登录，以支持“跳过邮箱确认”的需求。
         console.log('准备注册用户，邮箱:', email.value, '重定向URL:', redirectTo);
-        // 尝试使用最新的API参数格式
         response = await supabase.auth.signUp({
           email: email.value,
           password: password.value,
           options: {
             emailRedirectTo: redirectTo,
-            // 明确指定需要发送确认邮件
             shouldCreateUser: true
           }
         })
         console.log('注册响应详情:', JSON.stringify(response, null, 2));
+
+        // 若没有获得会话，尝试直接登录
+        try {
+          if (!response?.data?.session) {
+            const loginAfterSignup = await supabase.auth.signInWithPassword({
+              email: email.value,
+              password: password.value,
+            });
+            response = loginAfterSignup;
+          }
+        } catch (e) {
+          console.warn('注册后直接登录失败（可能仍要求邮箱确认）:', e);
+        }
       }
 
     const { data, error } = response;
@@ -88,11 +100,11 @@ const handleAuth = async () => {
       // 检查是否有用户对象
       if (data.user) {
         console.log('Auth successful:', data.user)
-        authSuccessMessage.value = isLogin.value ? '登录成功！' : '注册成功！';
+        authSuccessMessage.value = isLogin.value ? '登录成功！' : '注册成功并已登录！';
         
         // 直接进行页面跳转，不再依赖setTimeout，确保跳转逻辑可靠执行
         // 为注册添加特殊处理，确保即使在邮箱未确认情况下也能正确处理
-        if (isLogin.value || (!isLogin.value && data.user.email_confirmed_at)) {
+        if (isLogin.value || (!isLogin.value && (data.session || data.user.email_confirmed_at))) {
           // 立即刷新会话以确保最新状态
           const { data: { session } } = await supabase.auth.getSession();
           if (session) {
@@ -114,7 +126,7 @@ const handleAuth = async () => {
       } else if (data.session) {
         // 有时可能只有session没有user对象，这也是成功状态
         console.log('Auth session established:', data.session)
-        authSuccessMessage.value = isLogin.value ? '登录成功！' : '注册成功！';
+        authSuccessMessage.value = isLogin.value ? '登录成功！' : '注册成功并已登录！';
         // 确保profile创建
         createProfileIfNeeded(data.session.user.id, data.session.user.email).catch(console.error);
         router.replace('/');
