@@ -58,12 +58,16 @@ const handleAuth = async () => {
       })
     } else {
       // Register - 添加redirectTo参数确保注册后能正确重定向
+      console.log('准备注册用户，邮箱:', email.value, '重定向URL:', redirectTo);
       response = await supabase.auth.signUp({
         email: email.value,
         password: password.value,
       }, {
-        redirectTo: redirectTo
+        redirectTo: redirectTo,
+        // 明确指定需要发送确认邮件
+        shouldCreateUser: true
       })
+      console.log('注册响应:', response);
     }
 
     const { data, error } = response;
@@ -91,10 +95,11 @@ const handleAuth = async () => {
           }
         } else if (!isLogin.value && !data.user.email_confirmed_at) {
           // 如果是注册但邮箱未确认，显示提示信息
-          authSuccessMessage.value = '注册成功！请检查邮箱进行确认。';
+          console.log('用户注册成功但邮箱未确认，检查垃圾邮件文件夹');
+          authSuccessMessage.value = '注册成功！确认邮件已发送，请检查邮箱(包括垃圾邮件文件夹)进行确认。';
           setTimeout(() => {
             authSuccessMessage.value = null;
-          }, 5000); // 显示更长时间
+          }, 8000); // 显示更长时间，让用户有足够时间看到提示
         }
       } else if (data.session) {
         // 有时可能只有session没有user对象，这也是成功状态
