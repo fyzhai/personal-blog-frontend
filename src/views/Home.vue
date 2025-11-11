@@ -56,21 +56,20 @@ const isSearching = ref(false) // 标记是否正在进行搜索
 let searchTimeout = null; // 用于防抖
 
 const fetchPosts = async () => {
-  console.log("fetchPosts: Starting...");
-  loading.value = true
-  isSearching.value = !!searchQuery.value.trim(); // 设置搜索状态
+  console.log("fetchPosts started with search:", searchQuery.value);
+  loading.value = true;
   
-  let query = supabase
-    .from('posts')
-    .select(`
-      id, 
-      title, 
-      content, 
-      published_at,
-      profiles(username) // 关联作者信息
-    `)
-    .eq('is_published', true)
-    .order('published_at', { ascending: false })
+  // 简单的搜索状态设置
+  const searchTerm = searchQuery.value.trim();
+  isSearching.value = searchTerm !== '';
+  
+  try {
+    // 构建基础查询
+    let query = supabase
+      .from('posts')
+      .select('id, title, content, published_at, profiles(username)')
+      .eq('is_published', true)
+      .order('published_at', { ascending: false });
 
   if (searchQuery.value) {
     // 修复模糊搜索查询语法
@@ -84,16 +83,34 @@ const fetchPosts = async () => {
     }
   }
 
-  const { data, error } = await query;
-
-  if (error) {
-    console.error('Error fetching posts:', error.message)
-  } else {
-    posts.value = data || []
-    console.log("fetchPosts: Data fetched, posts.value now:", posts.value);
+    // 执行查询
+    console.log('Ready to execute query');
+    const { data, error } = await query;
+    
+    if (error) {
+      console.error('Query returned error:', error);
+      // 即使查询出错，我们也应该清空帖子列表，而不是让错误状态持续
+      posts.value = [];
+    } else {
+      // 成功获取数据
+      posts.value = data || [];
+      console.log('Data fetched successfully, count:', posts.value.length);
+      
+      // 如果是搜索结果，记录一下
+      if (isSearching.value) {
+        console.log('Search completed for:', searchTerm);
+      }
+    }
+  } catch (e) {
+    // 捕获所有可能的错误
+    console.error('Unexpected error in fetchPosts:', e);
+    // 出错时重置帖子列表
+    posts.value = [];
   }
-  loading.value = false
-  console.log("fetchPosts: Finished, loading.value:", loading.value, "posts.length:", posts.value.length);
+  
+  // 无论如何都要重置加载状态
+  loading.value = false;
+  console.log('fetchPosts finished');
 }
 
 const handleSearchInput = () => {
