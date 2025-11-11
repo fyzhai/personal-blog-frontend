@@ -67,11 +67,10 @@ const fetchPosts = async () => {
     .order('published_at', { ascending: false })
 
   if (searchQuery.value) {
-    const searchTerm = `%${searchQuery.value.toLowerCase()}%`;
-    // 修复搜索逻辑：同时通过文章标题和作者名称搜索
-    query = query.or(
-      `title.ilike.${searchTerm},profiles.username.ilike.${searchTerm}`
-    );
+    // 正确使用PostgREST的or操作符语法
+    // 需要将百分号进行URL编码(%25)并正确构造查询字符串
+    const searchTerm = searchQuery.value.toLowerCase();
+    query = query.or(`title.ilike.%25${encodeURIComponent(searchTerm)}%25,profiles.username.ilike.%25${encodeURIComponent(searchTerm)}%25`);
   }
 
   const { data, error } = await query;
