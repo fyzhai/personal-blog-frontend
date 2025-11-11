@@ -109,7 +109,7 @@ onUnmounted(() => {
     </header>
     <router-view />
     <footer>
-      <p>&copy; 2025 个人博客</p>
+      <p class="muted">&copy; 2025 个人博客 · 由 Supabase & Netlify 驱动</p>
     </footer>
   </div>
 </template>

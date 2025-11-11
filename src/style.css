@@ -1,15 +1,17 @@
 /* 全局样式 */
 
 :root {
-  --primary-blue: #007bff;
-  --light-blue: #e0f2ff;
-  --dark-blue: #0056b3;
-  --text-color: #333;
-  --heading-color: #222;
+  --primary-blue: #2563eb; /* indigo-600 */
+  --light-blue: #dbeafe;   /* indigo-100 */
+  --dark-blue: #1e40af;    /* indigo-800 */
+  --text-color: #1f2937;   /* gray-800 */
+  --muted-text: #6b7280;   /* gray-500 */
+  --heading-color: #111827;/* gray-900 */
   --background-white: #ffffff;
-  --light-gray: #f8f8f8;
-  --border-gray: #eee;
-  --lighter-gray: #f2f2f2;
+  --light-gray: #f8fafc;   /* slate-50 */
+  --border-gray: #e5e7eb;  /* gray-200 */
+  --lighter-gray: #f1f5f9; /* slate-100 */
+  --shadow-color: 0 10px 30px rgba(30, 64, 175, 0.08);
 }
 
 body {
@@ -19,7 +21,7 @@ body {
   -moz-osx-font-smoothing: grayscale;
   color: var(--text-color);
   line-height: 1.6;
-  background-color: var(--lighter-gray); /* 稍微深一点的背景色 */
+  background-color: var(--lighter-gray);
 }
 
 #app {
@@ -29,15 +31,17 @@ body {
 }
 
 header {
-  background-color: var(--primary-blue);
-  padding: 1rem 2rem;
+  background: linear-gradient(90deg, var(--primary-blue), #3b82f6);
+  padding: 0.85rem 2rem;
   color: var(--background-white);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-  position: fixed; /* 固定定位 */
+  box-shadow: var(--shadow-color);
+  position: fixed;
   top: 0;
   left: 0;
   width: 100%;
-  z-index: 100; /* 确保导航栏在其他内容之上 */
+  z-index: 100;
+  -webkit-backdrop-filter: saturate(1.2) blur(6px);
+  backdrop-filter: saturate(1.2) blur(6px);
 }
 
 header nav {
@@ -60,7 +64,7 @@ header nav a {
 
 header nav a:hover,
 header nav a.router-link-active {
-  background-color: var(--dark-blue);
+  background-color: rgba(255,255,255,0.15);
   transform: translateY(-2px);
   text-decoration: none;
 }
@@ -72,7 +76,7 @@ main {
   margin: 0 auto;
   width: 100%;
   box-sizing: border-box;
-  margin-top: 80px; /* 为固定导航栏留出空间，假设导航栏高度为 80px */
+  margin-top: 80px; /* 为固定导航栏留出空间 */
 }
 
 footer {
@@ -80,7 +84,7 @@ footer {
   padding: 2rem;
   text-align: center;
   border-top: 1px solid var(--border-gray);
-  color: var(--text-color);
+  color: var(--muted-text);
   font-size: 0.9rem;
 }
 
@@ -157,9 +161,20 @@ textarea {
 .card {
   background-color: var(--background-white);
   border-radius: 10px;
-  box-shadow: 0 6px 15px rgba(0, 0, 0, 0.08);
+  box-shadow: var(--shadow-color);
   padding: 2.5rem;
   margin-bottom: 2.5rem;
+}
+
+/* Subtle helper classes without改变组件结构 */
+.muted {
+  color: var(--muted-text);
+}
+
+.container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 1rem;
 }
 
 /* Form specific styles */
