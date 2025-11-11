@@ -93,9 +93,22 @@ const handleAuth = async () => {
     const { data, error } = response;
 
     if (error) {
-      authErrorMessage.value = error.message
-      setTimeout(() => authErrorMessage.value = null, 3000); // 3秒后清除消息
-      console.error('Auth error:', error)
+      // 更友好的错误提示
+      let friendly = error.message || '登录失败';
+      const rawMessage = (error.message || '').toLowerCase();
+      const status = (error.status || error.code || '').toString();
+
+      if (isLogin.value && (rawMessage.includes('invalid login') || rawMessage.includes('invalid credentials') || status === '400')) {
+        friendly = '邮箱或密码不正确，请重试';
+      } else if (!isLogin.value && rawMessage.includes('already registered')) {
+        friendly = '该邮箱已注册，请直接登录';
+      } else if (rawMessage.includes('email not confirmed')) {
+        friendly = '邮箱尚未确认，请前往邮箱完成确认后再试';
+      }
+
+      authErrorMessage.value = friendly;
+      setTimeout(() => authErrorMessage.value = null, 3500); // 3.5秒后清除消息
+      console.error('Auth error:', error);
     } else {
       // 检查是否有用户对象
       if (data.user) {
