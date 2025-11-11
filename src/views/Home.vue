@@ -68,9 +68,9 @@ const fetchPosts = async () => {
 
   if (searchQuery.value) {
     // 正确使用PostgREST的or操作符语法
-    // 需要将百分号进行URL编码(%25)并正确构造查询字符串
     const searchTerm = searchQuery.value.toLowerCase();
-    query = query.or(`title.ilike.%25${encodeURIComponent(searchTerm)}%25,profiles.username.ilike.%25${encodeURIComponent(searchTerm)}%25`);
+    // 使用正确的or查询格式，PostgREST需要使用括号包围条件
+    query = query.or(`(title.ilike.${encodeURIComponent('%')}${encodeURIComponent(searchTerm)}${encodeURIComponent('%')},profiles.username.ilike.${encodeURIComponent('%')}${encodeURIComponent(searchTerm)}${encodeURIComponent('%')})`);
   }
 
   const { data, error } = await query;
